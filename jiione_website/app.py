@@ -1,20 +1,26 @@
+```python
 """
 Jii One Facilities — website backend
 Flask + MongoDB (pymongo)
 
-Two separate auth systems, kept in separate collections so a client
-account can never accidentally get admin rights:
-  - users  collection  -> client/customer login   (session['user_id'])
-  - admins collection  -> staff/admin login        (session['admin_id'])
+Two separate auth systems:
+- users collection -> client/customer login (session['user_id'])
+- admins collection -> staff/admin login (session['admin_id'])
 """
 
 import os
 from datetime import datetime, timezone
 
 from flask import (
-    Flask, render_template, request, redirect,
-    url_for, session, flash
+    Flask,
+    render_template,
+    request,
+    redirect,
+    url_for,
+    session,
+    flash,
 )
+
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -57,21 +63,98 @@ requests_col = db["service_requests"]
 # ----------------------------------------------------------------------
 
 ICONS = {
-    "broom": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 4 10 14"/><path d="M10 14 6 22l4-2 2-4 4 2-2-4"/><circle cx="19.5" cy="4.5" r="1.4" fill="currentColor" stroke="none"/></svg>',
+    "broom": """
+        <svg viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="1.6"
+        stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 4 10 14"/>
+            <path d="M10 14 6 22l4-2 2-4 4 2-2-4"/>
+            <circle cx="19.5" cy="4.5" r="1.4"
+            fill="currentColor" stroke="none"/>
+        </svg>
+    """,
 
-    "shield": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.4 8.4 8 9 4.6-.6 8-4 8-9V6l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg>',
+    "shield": """
+        <svg viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="1.6"
+        stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3 4 6v6c0 5 3.4 8.4 8 9
+            4.6-.6 8-4 8-9V6l-8-3Z"/>
+            <path d="m9 12 2 2 4-4"/>
+        </svg>
+    """,
 
-    "cup": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V8Z"/><path d="M17 9h1.5a2.5 2.5 0 0 1 0 5H17"/><path d="M8 3c0 1-1 1-1 2s1 1 1 2M12 3c0 1-1 1-1 2s1 1 1 2"/></svg>',
+    "cup": """
+        <svg viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="1.6"
+        stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 8h13v5a5 5 0 0 1-5 5H9
+            a5 5 0 0 1-5-5V8Z"/>
+            <path d="M17 9h1.5a2.5 2.5 0 0 1 0 5H17"/>
+            <path d="M8 3c0 1-1 1-1 2s1 1 1 2"/>
+            <path d="M12 3c0 1-1 1-1 2s1 1 1 2"/>
+        </svg>
+    """,
 
-    "building": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="10" height="18"/><path d="M14 8h6v13h-6M7 7h1M11 7h1M7 11h1M11 11h1M7 15h1M11 15h1"/></svg>',
+    "building": """
+        <svg viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="1.6"
+        stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4" y="3" width="10" height="18"/>
+            <path d="M14 8h6v13h-6"/>
+            <path d="M7 7h1M11 7h1"/>
+            <path d="M7 11h1M11 11h1"/>
+            <path d="M7 15h1M11 15h1"/>
+        </svg>
+    """,
 
-    "bug": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="8" height="11" rx="4"/><path d="M12 8V5M9 5 7 3M15 5l2-2M4 11l4 1M20 11l-4 1M4 18l4-1M20 18l-4-1"/></svg>',
+    "bug": """
+        <svg viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="1.6"
+        stroke-linecap="round" stroke-linejoin="round">
+            <rect x="8" y="8" width="8" height="11" rx="4"/>
+            <path d="M12 8V5"/>
+            <path d="M9 5 7 3"/>
+            <path d="M15 5l2-2"/>
+            <path d="M4 11l4 1"/>
+            <path d="M20 11l-4 1"/>
+            <path d="M4 18l4-1"/>
+            <path d="M20 18l-4-1"/>
+        </svg>
+    """,
 
-    "chart": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
+    "chart": """
+        <svg viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="1.6"
+        stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 20V10"/>
+            <path d="M10 20V4"/>
+            <path d="M16 20v-7"/>
+            <path d="M22 20H2"/>
+        </svg>
+    """,
 
-    "users": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3-6 7-6s7 2.7 7 6"/><circle cx="17" cy="8" r="2.6"/><path d="M16 14.2c2.7.5 5 2.6 5 5.8"/></svg>',
+    "users": """
+        <svg viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="1.6"
+        stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="9" cy="8" r="3"/>
+            <path d="M2 20c0-3.3 3-6 7-6s7 2.7 7 6"/>
+            <circle cx="17" cy="8" r="2.6"/>
+            <path d="M16 14.2c2.7.5 5 2.6 5 5.8"/>
+        </svg>
+    """,
 
-    "truck": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="12" height="10"/><path d="M14 10h4l4 3.5V17h-8"/><circle cx="6.5" cy="19" r="1.8"/><circle cx="17.5" cy="19" r="1.8"/></svg>',
+    "truck": """
+        <svg viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="1.6"
+        stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="7" width="12" height="10"/>
+            <path d="M14 10h4l4 3.5V17h-8"/>
+            <circle cx="6.5" cy="19" r="1.8"/>
+            <circle cx="17.5" cy="19" r="1.8"/>
+        </svg>
+    """,
 }
 
 
@@ -82,82 +165,111 @@ SERVICES = [
         "icon": "broom",
         "name": "Housekeeping Services",
         "desc": "Daily upkeep and cleaning for offices and commercial spaces.",
-        "detail": "Daily sweeping, mopping, dusting, washroom upkeep and waste management, carried out on a schedule that fits your working hours and doesn't disrupt your team."
+        "detail": (
+            "Daily sweeping, mopping, dusting, washroom upkeep and waste "
+            "management, carried out on a schedule that fits your working "
+            "hours and doesn't disrupt your team."
+        ),
     },
-
     {
         "code": "PC",
         "slug": "pest-control",
         "icon": "bug",
         "name": "Pest Control Services",
         "desc": "Scheduled treatments to keep premises pest-free.",
-        "detail": "Routine, safe pest-control treatments for offices, pantries and storage areas, with a visit schedule agreed up front and documented after every service."
+        "detail": (
+            "Routine, safe pest-control treatments for offices, pantries "
+            "and storage areas, with a visit schedule agreed up front and "
+            "documented after every service."
+        ),
     },
-
     {
         "code": "S",
         "slug": "security",
         "icon": "shield",
         "name": "Security Services",
         "desc": "Trained guards and access control for corporate premises.",
-        "detail": "Trained, uniformed security personnel for entry management, patrolling and visitor control, staffed to match your site's shift pattern."
+        "detail": (
+            "Trained, uniformed security personnel for entry management, "
+            "patrolling and visitor control, staffed to match your site's "
+            "shift pattern."
+        ),
     },
-
     {
         "code": "PM",
         "slug": "payroll-management",
         "icon": "chart",
         "name": "Payroll Management",
         "desc": "Accurate, on-time payroll handling for deployed staff.",
-        "detail": "End-to-end payroll processing for deployed staff — attendance, statutory compliance and disbursal — handled so it's one less thing for your HR team to track."
+        "detail": (
+            "End-to-end payroll processing for deployed staff — attendance, "
+            "statutory compliance and disbursal — handled so it's one less "
+            "thing for your HR team to track."
+        ),
     },
-
     {
         "code": "P",
         "slug": "pantry-office-boy",
         "icon": "cup",
         "name": "Pantry & Office Boy Services",
         "desc": "Day-to-day pantry running and general office support staff.",
-        "detail": "Dependable pantry staff and office assistants for tea/coffee service, courier handling, and the everyday errands that keep an office moving."
+        "detail": (
+            "Dependable pantry staff and office assistants for tea/coffee "
+            "service, courier handling, and the everyday errands that keep "
+            "an office moving."
+        ),
     },
-
     {
         "code": "CS",
         "slug": "corporate-staffing",
         "icon": "users",
         "name": "Corporate Staffing",
         "desc": "Reliable manpower sourcing across facility roles.",
-        "detail": "Vetted manpower across facility roles, sourced and deployed quickly so you're never short-staffed at a site."
+        "detail": (
+            "Vetted manpower across facility roles, sourced and deployed "
+            "quickly so you're never short-staffed at a site."
+        ),
     },
-
     {
         "code": "F",
         "slug": "facade-cleaning",
         "icon": "building",
         "name": "Facade Cleaning",
         "desc": "Exterior and high-rise building facade maintenance.",
-        "detail": "Trained crews and rigged access for exterior and high-rise facade cleaning, carried out with full safety protocols."
+        "detail": (
+            "Trained crews and rigged access for exterior and high-rise "
+            "facade cleaning, carried out with full safety protocols."
+        ),
     },
-
     {
         "code": "MH",
         "slug": "material-handling",
         "icon": "truck",
         "name": "Material Handling",
         "desc": "Safe, organised handling and movement of materials on site.",
-        "detail": "Organised loading, moving and storage of materials on site, with trained handling staff to reduce damage and downtime."
+        "detail": (
+            "Organised loading, moving and storage of materials on site, "
+            "with trained handling staff to reduce damage and downtime."
+        ),
     },
 ]
 
 
-for _s in SERVICES:
-    _s["icon_svg"] = Markup(ICONS[_s["icon"]])
+for service in SERVICES:
+    service["icon_svg"] = Markup(
+        ICONS[service["icon"]]
+    )
 
 
 SERVICES_BY_SLUG = {
-    s["slug"]: s for s in SERVICES
+    service["slug"]: service
+    for service in SERVICES
 }
 
+
+# ----------------------------------------------------------------------
+# Global template variables
+# ----------------------------------------------------------------------
 
 @app.context_processor
 def inject_globals():
@@ -205,8 +317,10 @@ def service_detail(slug):
         session_user_name = None
 
         if session.get("user_id"):
-            u = _require_user()
-            session_user_name = u["name"] if u else None
+            user = _require_user()
+
+            if user:
+                session_user_name = user["name"]
 
         return render_template(
             "service_detail.html",
@@ -262,27 +376,31 @@ def service_detail(slug):
             or int(staff_count) < 1
         ):
             return render_this(
-                "Please enter how many staff you need (a number of 1 or more)."
+                "Please enter how many staff you need "
+                "(a number of 1 or more)."
             )
 
-        requests_col.insert_one({
-            "user_id": user["_id"],
-            "user_name": user["name"],
-            "user_email": user["email"],
-            "company": user.get("company", ""),
-            "service_slug": service["slug"],
-            "service_name": service["name"],
-            "staff_count": int(staff_count),
-            "site": site,
-            "needed_from": needed_from,
-            "notes": notes,
-            "status": "pending",
-            "created_at": datetime.now(timezone.utc),
-        })
+        requests_col.insert_one(
+            {
+                "user_id": user["_id"],
+                "user_name": user["name"],
+                "user_email": user["email"],
+                "company": user.get("company", ""),
+                "service_slug": service["slug"],
+                "service_name": service["name"],
+                "staff_count": int(staff_count),
+                "site": site,
+                "needed_from": needed_from,
+                "notes": notes,
+                "status": "pending",
+                "created_at": datetime.now(timezone.utc),
+            }
+        )
 
         flash(
             f"Your request for {staff_count} staff under "
-            f"{service['name']} has been sent. We'll confirm shortly.",
+            f"{service['name']} has been sent. "
+            "We'll confirm shortly.",
             "success"
         )
 
@@ -305,11 +423,31 @@ def contact():
     if request.method == "POST":
 
         enquiry = {
-            "name": request.form.get("name", "").strip(),
-            "company": request.form.get("company", "").strip(),
-            "phone": request.form.get("phone", "").strip(),
-            "email": request.form.get("email", "").strip(),
-            "message": request.form.get("message", "").strip(),
+            "name": request.form.get(
+                "name",
+                ""
+            ).strip(),
+
+            "company": request.form.get(
+                "company",
+                ""
+            ).strip(),
+
+            "phone": request.form.get(
+                "phone",
+                ""
+            ).strip(),
+
+            "email": request.form.get(
+                "email",
+                ""
+            ).strip(),
+
+            "message": request.form.get(
+                "message",
+                ""
+            ).strip(),
+
             "created_at": datetime.now(timezone.utc),
         }
 
@@ -331,7 +469,8 @@ def contact():
         enquiries_col.insert_one(enquiry)
 
         flash(
-            "Thanks — your enquiry has been sent. We'll be in touch shortly.",
+            "Thanks — your enquiry has been sent. "
+            "We'll be in touch shortly.",
             "success"
         )
 
@@ -344,7 +483,7 @@ def contact():
 
 
 # ----------------------------------------------------------------------
-# Client (user) auth
+# Client / Customer authentication
 # ----------------------------------------------------------------------
 
 @app.route("/register", methods=["GET", "POST"])
@@ -383,10 +522,14 @@ def register():
             ""
         )
 
-        if not name or not email or len(password) < 6:
-
+        if (
+            not name
+            or not email
+            or len(password) < 6
+        ):
             flash(
-                "Please fill in all required fields (password min 6 characters).",
+                "Please fill in all required fields "
+                "(password min 6 characters).",
                 "error"
             )
 
@@ -399,7 +542,8 @@ def register():
         if users_col.find_one({"email": email}):
 
             flash(
-                "An account with that email already exists. Please log in.",
+                "An account with that email already exists. "
+                "Please log in.",
                 "error"
             )
 
@@ -410,13 +554,17 @@ def register():
                 )
             )
 
-        users_col.insert_one({
-            "name": name,
-            "company": company,
-            "email": email,
-            "password_hash": generate_password_hash(password),
-            "created_at": datetime.now(timezone.utc),
-        })
+        users_col.insert_one(
+            {
+                "name": name,
+                "company": company,
+                "email": email,
+                "password_hash": generate_password_hash(
+                    password
+                ),
+                "created_at": datetime.now(timezone.utc),
+            }
+        )
 
         flash(
             "Account created. Please log in.",
@@ -463,9 +611,9 @@ def login():
             ""
         )
 
-        user = users_col.find_one({
-            "email": email
-        })
+        user = users_col.find_one(
+            {"email": email}
+        )
 
         if (
             user
@@ -525,9 +673,11 @@ def _require_user():
     if not uid:
         return None
 
-    return users_col.find_one({
-        "_id": ObjectId(uid)
-    })
+    return users_col.find_one(
+        {
+            "_id": ObjectId(uid)
+        }
+    )
 
 
 @app.route("/dashboard")
@@ -547,18 +697,22 @@ def dashboard():
         )
 
     enquiries = list(
-        enquiries_col.find({
-            "email": user["email"]
-        }).sort(
+        enquiries_col.find(
+            {
+                "email": user["email"]
+            }
+        ).sort(
             "created_at",
             -1
         )
     )
 
     staff_requests = list(
-        requests_col.find({
-            "user_id": user["_id"]
-        }).sort(
+        requests_col.find(
+            {
+                "user_id": user["_id"]
+            }
+        ).sort(
             "created_at",
             -1
         )
@@ -574,7 +728,8 @@ def dashboard():
 
 
 # ----------------------------------------------------------------------
-# Admin auth
+# Admin authentication
+# Separate collection and separate session key
 # ----------------------------------------------------------------------
 
 @app.route("/admin/login", methods=["GET", "POST"])
@@ -597,9 +752,11 @@ def admin_login():
             ""
         )
 
-        admin = admins_col.find_one({
-            "username": username
-        })
+        admin = admins_col.find_one(
+            {
+                "username": username
+            }
+        )
 
         if (
             admin
@@ -663,6 +820,7 @@ def admin_logout():
 
 
 def _require_admin():
+
     return bool(
         session.get("admin_id")
     )
@@ -722,7 +880,10 @@ def admin_dashboard():
 
 
 # ----------------------------------------------------------------------
-# CLI helper: create admin manually if needed
+# CLI helper: create the first admin account
+#
+# Run:
+# flask --app app.py create-admin
 # ----------------------------------------------------------------------
 
 @app.cli.command("create-admin")
@@ -734,9 +895,17 @@ def create_admin():
         "Admin username: "
     ).strip().lower()
 
-    if admins_col.find_one({
-        "username": username
-    }):
+    if not username:
+        print(
+            "Username cannot be empty."
+        )
+        return
+
+    if admins_col.find_one(
+        {
+            "username": username
+        }
+    ):
 
         print(
             "An admin with that username already exists."
@@ -752,6 +921,12 @@ def create_admin():
         "Confirm password: "
     )
 
+    if not password:
+        print(
+            "Password cannot be empty."
+        )
+        return
+
     if password != confirm:
 
         print(
@@ -760,11 +935,15 @@ def create_admin():
 
         return
 
-    admins_col.insert_one({
-        "username": username,
-        "password_hash": generate_password_hash(password),
-        "created_at": datetime.now(timezone.utc),
-    })
+    admins_col.insert_one(
+        {
+            "username": username,
+            "password_hash": generate_password_hash(
+                password
+            ),
+            "created_at": datetime.now(timezone.utc),
+        }
+    )
 
     print(
         f"Admin '{username}' created."
@@ -772,54 +951,14 @@ def create_admin():
 
 
 # ----------------------------------------------------------------------
-# Automatic admin creation for Render
-# ----------------------------------------------------------------------
-
-def ensure_admin():
-
-    username = os.environ.get(
-        "ADMIN_USERNAME",
-        ""
-    ).strip().lower()
-
-    password = os.environ.get(
-        "ADMIN_PASSWORD",
-        ""
-    )
-
-    # Do nothing if Render environment variables
-    # have not been configured.
-    if not username or not password:
-        return
-
-    # Do not overwrite an existing admin.
-    if admins_col.find_one({
-        "username": username
-    }):
-        return
-
-    admins_col.insert_one({
-        "username": username,
-        "password_hash": generate_password_hash(password),
-        "created_at": datetime.now(timezone.utc),
-    })
-
-    print(
-        f"Admin '{username}' created automatically."
-    )
-
-
-# Create the admin when the application starts.
-ensure_admin()
-
-
-# ----------------------------------------------------------------------
-# Local development
+# Run application
 # ----------------------------------------------------------------------
 
 if __name__ == "__main__":
+
     app.run(
         debug=True,
         host="0.0.0.0",
         port=5000
     )
+```
