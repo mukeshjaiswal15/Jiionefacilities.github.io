@@ -27,7 +27,7 @@ from markupsafe import Markup
 
 
 # ----------------------------------------------------------------------
-# App & database setup
+# App & Database Setup
 # ----------------------------------------------------------------------
 
 app = Flask(__name__)
@@ -58,7 +58,7 @@ requests_col = db["service_requests"]
 
 
 # ----------------------------------------------------------------------
-# Static site content
+# Static Site Content
 # ----------------------------------------------------------------------
 
 ICONS = {
@@ -267,7 +267,7 @@ SERVICES_BY_SLUG = {
 
 
 # ----------------------------------------------------------------------
-# Global template variables
+# Global Template Variables
 # ----------------------------------------------------------------------
 
 @app.context_processor
@@ -278,7 +278,7 @@ def inject_globals():
 
 
 # ----------------------------------------------------------------------
-# Public pages
+# Public Pages
 # ----------------------------------------------------------------------
 
 @app.route("/")
@@ -305,13 +305,24 @@ def service_detail(slug):
     service = SERVICES_BY_SLUG.get(slug)
 
     if not service:
-        flash("That service could not be found.", "error")
-        return redirect(url_for("services"))
+        flash(
+            "That service could not be found.",
+            "error"
+        )
+        return redirect(
+            url_for("services")
+        )
 
-    def render_this(extra_flash=None, category="error"):
+    def render_this(
+        extra_flash=None,
+        category="error"
+    ):
 
         if extra_flash:
-            flash(extra_flash, category)
+            flash(
+                extra_flash,
+                category
+            )
 
         session_user_name = None
 
@@ -349,6 +360,27 @@ def service_detail(slug):
 
         user = _require_user()
 
+        if not user:
+            session.pop(
+                "user_id",
+                None
+            )
+
+            flash(
+                "Your session has expired. Please log in again.",
+                "error"
+            )
+
+            return redirect(
+                url_for(
+                    "login",
+                    next=url_for(
+                        "service_detail",
+                        slug=slug
+                    )
+                )
+            )
+
         staff_count = request.form.get(
             "staff_count",
             ""
@@ -384,7 +416,10 @@ def service_detail(slug):
                 "user_id": user["_id"],
                 "user_name": user["name"],
                 "user_email": user["email"],
-                "company": user.get("company", ""),
+                "company": user.get(
+                    "company",
+                    ""
+                ),
                 "service_slug": service["slug"],
                 "service_name": service["name"],
                 "staff_count": int(staff_count),
@@ -403,7 +438,9 @@ def service_detail(slug):
             "success"
         )
 
-        return redirect(url_for("dashboard"))
+        return redirect(
+            url_for("dashboard")
+        )
 
     return render_this()
 
@@ -440,7 +477,7 @@ def contact():
             "email": request.form.get(
                 "email",
                 ""
-            ).strip(),
+            ).strip().lower(),
 
             "message": request.form.get(
                 "message",
@@ -465,7 +502,9 @@ def contact():
                 active="contact"
             )
 
-        enquiries_col.insert_one(enquiry)
+        enquiries_col.insert_one(
+            enquiry
+        )
 
         flash(
             "Thanks — your enquiry has been sent. "
@@ -473,7 +512,9 @@ def contact():
             "success"
         )
 
-        return redirect(url_for("contact"))
+        return redirect(
+            url_for("contact")
+        )
 
     return render_template(
         "contact.html",
@@ -482,7 +523,7 @@ def contact():
 
 
 # ----------------------------------------------------------------------
-# Client / Customer authentication
+# Client / Customer Authentication
 # ----------------------------------------------------------------------
 
 @app.route("/register", methods=["GET", "POST"])
@@ -538,7 +579,11 @@ def register():
                 next=next_url
             )
 
-        if users_col.find_one({"email": email}):
+        if users_col.find_one(
+            {
+                "email": email
+            }
+        ):
 
             flash(
                 "An account with that email already exists. "
@@ -611,7 +656,9 @@ def login():
         )
 
         user = users_col.find_one(
-            {"email": email}
+            {
+                "email": email
+            }
         )
 
         if (
@@ -667,16 +714,21 @@ def logout():
 
 def _require_user():
 
-    uid = session.get("user_id")
+    uid = session.get(
+        "user_id"
+    )
 
     if not uid:
         return None
 
-    return users_col.find_one(
-        {
-            "_id": ObjectId(uid)
-        }
-    )
+    try:
+        return users_col.find_one(
+            {
+                "_id": ObjectId(uid)
+            }
+        )
+    except Exception:
+        return None
 
 
 @app.route("/dashboard")
@@ -685,6 +737,11 @@ def dashboard():
     user = _require_user()
 
     if not user:
+
+        session.pop(
+            "user_id",
+            None
+        )
 
         flash(
             "Please log in to view your account.",
@@ -727,8 +784,7 @@ def dashboard():
 
 
 # ----------------------------------------------------------------------
-# Admin authentication
-# Separate collection and separate session key
+# Admin Authentication
 # ----------------------------------------------------------------------
 
 @app.route("/admin/login", methods=["GET", "POST"])
@@ -861,7 +917,10 @@ def admin_dashboard():
     )
 
     total_staff_requested = sum(
-        r.get("staff_count", 0)
+        r.get(
+            "staff_count",
+            0
+        )
         for r in staff_requests
     )
 
@@ -879,9 +938,9 @@ def admin_dashboard():
 
 
 # ----------------------------------------------------------------------
-# CLI helper: create the first admin account
+# CLI Helper: Create First Admin Account
 #
-# Run:
+# Run locally:
 # flask --app app.py create-admin
 # ----------------------------------------------------------------------
 
@@ -950,7 +1009,7 @@ def create_admin():
 
 
 # ----------------------------------------------------------------------
-# Run application
+# Run Application
 # ----------------------------------------------------------------------
 
 if __name__ == "__main__":
@@ -960,4 +1019,3 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=5000
     )
-```
